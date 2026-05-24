@@ -43,6 +43,7 @@ Principais opcoes:
 - `MZInteriorsConfig.Commands.requireAce`
 - `MZInteriorsConfig.Commands.ace`
 - `MZInteriorsConfig.DefaultSpawnBase`
+- `MZInteriorsConfig.CollisionTimeoutMs`
 - `MZInteriorsConfig.Shells`
 
 Exemplo de shell:
@@ -56,6 +57,25 @@ MZInteriorsConfig.Shells.shell_test = {
   heading = 0.0
 }
 ```
+
+Shells atualmente selecionaveis:
+
+```txt
+apartment_low -> shell_v16low
+container -> container_shell
+house_mid -> shell_v16mid
+motel_modern -> modernhotel_shell
+shell_test -> shell_v16low
+```
+
+Outros modelos existentes em `stream/` ficam cadastrados como `enabled = false`
+quando ainda nao possuem offset seguro de saida. Eles aparecem no diagnostico,
+mas nao devem ser oferecidos como opcao de criacao/edicao de imovel ate serem
+calibrados.
+
+`house_mid` usa offset relativo de saida `z = 1.15`. Um offset negativo nesse
+campo joga o player abaixo da shell, porque ele e somado ao
+`DefaultSpawnBase.z`.
 
 ## Comandos debug
 
@@ -86,6 +106,11 @@ exports['mz_interiors']:IsInsideInterior()
 exports['mz_interiors']:GetCurrentInterior()
 exports['mz_interiors']:GetShells()
 ```
+
+`GetShells()` tambem existe server-side e retorna uma lista sanitizada com
+`name`, `label`, `model`, `enabled`, `selectable`, `hasExit` e
+`disabledReason`. O `mz_houses` usa esse contrato para montar o select do menu
+admin e validar shell no servidor.
 
 Exemplo:
 

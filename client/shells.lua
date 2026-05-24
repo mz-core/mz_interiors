@@ -156,6 +156,7 @@ local function createShellObject(shellName, shell, spawnCoords)
   SetEntityHeading(object, heading)
   FreezeEntityPosition(object, true)
   SetEntityInvincible(object, true)
+  RequestCollisionAtCoord(spawnCoords.x, spawnCoords.y, spawnCoords.z)
 
   MZInteriors.Debug('shell_object_created', {
     shell = shellName,
@@ -168,6 +169,29 @@ local function createShellObject(shellName, shell, spawnCoords)
 
   unloadModel(modelHash)
   return true, object
+end
+
+local function waitForCollisionAt(coords, timeoutMs)
+  if not coords then
+    return false
+  end
+
+  RequestCollisionAtCoord(coords.x, coords.y, coords.z)
+  NewLoadSceneStart(coords.x, coords.y, coords.z, coords.x, coords.y, coords.z, 35.0, 0)
+
+  local startedAt = GetGameTimer()
+  local loaded = false
+  while GetGameTimer() - startedAt < (tonumber(timeoutMs) or tonumber(MZInteriorsConfig.CollisionTimeoutMs) or 5000) do
+    RequestCollisionAtCoord(coords.x, coords.y, coords.z)
+    if HasCollisionLoadedAroundEntity(PlayerPedId()) then
+      loaded = true
+      break
+    end
+    Wait(50)
+  end
+
+  NewLoadSceneStop()
+  return loaded
 end
 
 local function resetState()
@@ -228,6 +252,10 @@ function MZInteriors.EnterShell(shellName, entranceCoords, options)
     return false, shellErr or 'shell_not_found'
   end
 
+  if shell.enabled == false then
+    return false, shell.disabledReason or 'shell_disabled'
+  end
+
   if not shell.model or tostring(shell.model) == '' then
     return false, 'missing_model'
   end
@@ -253,6 +281,13 @@ function MZInteriors.EnterShell(shellName, entranceCoords, options)
     tonumber(options.heading or exitOffset.w or shell.heading) or 0.0
   )
 
+  MZInteriors.Debug('enter_shell_prepare', {
+    shell = normalizedShellName,
+    model = shell.model,
+    spawn = { x = spawnCoords.x, y = spawnCoords.y, z = spawnCoords.z },
+    target = { x = internalCoords.x, y = internalCoords.y, z = internalCoords.z, w = internalCoords.w }
+  })
+
   fadeOut()
   FreezeEntityPosition(ped, true)
 
@@ -265,6 +300,11 @@ function MZInteriors.EnterShell(shellName, entranceCoords, options)
 
   SetEntityCoords(ped, internalCoords.x, internalCoords.y, internalCoords.z, false, false, false, false)
   SetEntityHeading(ped, internalCoords.w)
+  local collisionLoaded = waitForCollisionAt(vector3(internalCoords.x, internalCoords.y, internalCoords.z))
+  MZInteriors.Debug('enter_shell_collision', {
+    shell = normalizedShellName,
+    loaded = collisionLoaded == true
+  })
   Wait(100)
   FreezeEntityPosition(ped, false)
   fadeIn()
@@ -329,7 +369,28 @@ function MZInteriors.GetCurrentInterior()
 end
 
 function MZInteriors.GetShells()
-  return MZInteriorsConfig.Shells or {}
+  local shells = MZInteriorsConfig.Shells or {}
+  local out = {}
+
+  for name, shell in pairs(shells) do
+    shell = type(shell) == 'table' and shell or {}
+    local enabled = shell.enabled ~= false and shell.exit ~= nil and tostring(shell.model or '') ~= ''
+    out[#out + 1] = {
+      name = name,
+      label = shell.label or name,
+      model = shell.model,
+      enabled = enabled,
+      selectable = enabled,
+      disabledReason = enabled and nil or (shell.disabledReason or 'missing_model_or_exit'),
+      hasExit = shell.exit ~= nil
+    }
+  end
+
+  table.sort(out, function(left, right)
+    return tostring(left.name or '') < tostring(right.name or '')
+  end)
+
+  return out
 end
 
 exports('EnterShell', function(shellName, entranceCoords, options)

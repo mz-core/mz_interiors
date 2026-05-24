@@ -89,10 +89,12 @@ local function listShells()
 
   for _, name in ipairs(names) do
     local shell = shells[name] or {}
-    print(('[mz_interiors] %s - %s (%s)'):format(
+    print(('[mz_interiors] %s - %s (%s) enabled=%s reason=%s'):format(
       name,
       tostring(shell.label or 'Sem label'),
-      tostring(shell.model or 'sem_model')
+      tostring(shell.model or 'sem_model'),
+      tostring(shell.enabled ~= false and shell.exit ~= nil),
+      tostring(shell.disabledReason or 'nil')
     ))
   end
 end
