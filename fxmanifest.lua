@@ -7,7 +7,8 @@ description 'Data-driven temporary shell/interior layer for mz_core ecosystem'
 version '0.1.0'
 
 shared_scripts {
-  'shared/config.lua'
+  'shared/config.lua',
+  'shared/furniture_bounds.lua'
 }
 
 client_scripts {

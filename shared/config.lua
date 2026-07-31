@@ -19,8 +19,9 @@ MZInteriorsConfig.Notify = {
   chatFallback = true
 }
 
--- Base subterranea usada para shells temporarios de debug/MVP.
--- Cada entrada recebe pequeno offset por player/timer para reduzir sobreposicao.
+-- Base subterranea usada somente quando EnterShell nao recebe spawnBase.
+-- Entradas locais/debug recebem offset por player/timer para reduzir sobreposicao;
+-- uma spawnBase explicita e usada sem qualquer alteracao pelo mz_interiors.
 MZInteriorsConfig.DefaultSpawnBase = vector3(0.0, 0.0, -50.0)
 MZInteriorsConfig.SpawnSpacing = 40.0
 MZInteriorsConfig.ModelLoadTimeoutMs = 8000
@@ -40,8 +41,29 @@ MZInteriorsConfig.Shells = {
     model = 'shell_v16low',
     enabled = true,
     offset = vector3(0.0, 0.0, 0.0),
+
+    entry = vector4(4.693, -6.015, 1.11, 358.634),
     exit = vector4(4.693, -6.015, 1.11, 358.634),
-    heading = 0.0
+
+    heading = 0.0,
+
+    -- Primeiro shell liberado para placement residencial. Coordenadas relativas
+    -- ao spawnBase e revisadas de forma conservadora.
+    furniture = {
+      enabled = true,
+      revision = 1,
+      bounds = {
+        min = { x = -4.15, y = -6.45, z = 0.05 },
+        max = { x = 5.25, y = 4.35, z = 2.80 }
+      },
+      blockedZones = {
+        {
+          name = 'saida',
+          min = { x = 3.35, y = -6.45, z = 0.00 },
+          max = { x = 5.25, y = -4.45, z = 2.80 }
+        }
+      }
+    }
   },
 
   apartment_low = {
@@ -49,7 +71,10 @@ MZInteriorsConfig.Shells = {
     model = 'shell_v16low',
     enabled = true,
     offset = vector3(0.0, 0.0, 0.0),
+
+    entry = vector4(4.693, -6.015, 1.11, 358.634),
     exit = vector4(4.693, -6.015, 1.11, 358.634),
+
     heading = 0.0
   },
 
@@ -60,7 +85,9 @@ MZInteriorsConfig.Shells = {
     offset = vector3(0.0, 0.0, 0.0),
     -- Offset relativo ao spawn da shell. Antes estava -48.85, o que jogava
     -- o player para baixo da shell quando DefaultSpawnBase.z = -50.0.
+    entry = vector4(1.44, -8.27, 1.15, 268.82),
     exit = vector4(1.44, -8.27, 1.15, 268.82),
+
     heading = 0.0
   },
 
@@ -69,7 +96,10 @@ MZInteriorsConfig.Shells = {
     model = 'container_shell',
     enabled = true,
     offset = vector3(0.0, 0.0, 0.0),
+    
+    entry = vector4(0.08, -5.73, 1.24, 359.32),
     exit = vector4(0.08, -5.73, 1.24, 359.32),
+
     heading = 0.0
   },
 
@@ -78,7 +108,10 @@ MZInteriorsConfig.Shells = {
     model = 'modernhotel_shell',
     enabled = true,
     offset = vector3(0.0, 0.0, 0.0),
+
+    entry = vector4(4.98, 4.35, 1.16, 179.79),
     exit = vector4(4.98, 4.35, 1.16, 179.79),
+    
     heading = 0.0
   },
 

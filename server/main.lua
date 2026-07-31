@@ -29,7 +29,8 @@ local function listShells()
       enabled = enabled,
       selectable = enabled,
       disabledReason = enabled and nil or (shell.disabledReason or 'missing_model_or_exit'),
-      hasExit = shell.exit ~= nil
+      hasExit = shell.exit ~= nil,
+      furnitureReady = MZInteriorsFurnitureBounds.Get(name) ~= nil
     }
   end
 
@@ -71,4 +72,14 @@ end)
 
 exports('GetShells', function()
   return listShells()
+end)
+
+exports('GetFurnitureBounds', function(shellName)
+  local definition, err = MZInteriorsFurnitureBounds.Get(shellName)
+  if not definition then return false, err end
+  return true, MZInteriorsFurnitureBounds.Copy(definition)
+end)
+
+exports('ValidateFurniturePlacement', function(shellName, offset, footprintRadius)
+  return MZInteriorsFurnitureBounds.ValidatePlacement(shellName, offset, footprintRadius)
 end)
