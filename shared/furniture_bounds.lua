@@ -57,7 +57,9 @@ end
 function MZInteriorsFurnitureBounds.Get(shellName)
   shellName = tostring(shellName or ''):gsub('^%s+', ''):gsub('%s+$', '')
   local shells = type(MZInteriorsConfig) == 'table' and MZInteriorsConfig.Shells or {}
-  local shell = type(shells[shellName]) == 'table' and shells[shellName] or nil
+  local ipls = type(MZInteriorsConfig) == 'table' and MZInteriorsConfig.IPLInteriors or {}
+  local shell = type(shells[shellName]) == 'table' and shells[shellName]
+    or type(ipls[shellName]) == 'table' and ipls[shellName] or nil
   if not shell or shell.enabled == false then return nil, 'shell_unavailable' end
   return MZInteriorsFurnitureBounds.Normalize(shellName, shell.furniture)
 end

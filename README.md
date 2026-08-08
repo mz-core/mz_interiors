@@ -1,12 +1,13 @@
 # mz_interiors
 
-Camada basica de interiores/shells temporarios para o ecossistema MZ.
+Camada data-driven de shells temporarios e IPLs nativos para o ecossistema MZ.
 
 Este resource foi criado para ser usado futuramente por `mz_houses` e `mz_realestate`, mas nesta fase ele nao implementa casas, venda, dono, chaves, bau, guarda-roupa, garagem, SQL ou decoracao.
 
 ## O que ele faz
 
 - Cria um shell/interior temporario client-side.
+- Carrega IPLs nativos cadastrados, com verificacao de collision e interior ID.
 - Teleporta o player para o offset interno configurado.
 - Permite sair e voltar para a posicao externa anterior.
 - Deleta o shell ao sair, limpar ou reiniciar o resource.
@@ -45,6 +46,8 @@ Principais opcoes:
 - `MZInteriorsConfig.DefaultSpawnBase`
 - `MZInteriorsConfig.CollisionTimeoutMs`
 - `MZInteriorsConfig.Shells`
+- `MZInteriorsConfig.IPLInteriors`
+- `MZInteriorsConfig.IPLCalibration`
 
 Exemplo de shell:
 
@@ -88,6 +91,26 @@ Comandos padrao:
 /mint_cleanup
 ```
 
+Calibracao de IPL e separada dos comandos comuns. Ela exige a convar
+`mz_interiors_ipl_calibration=1` e ACE de owner. Pelo console do servidor:
+
+```txt
+mint_ipl <source> meth_lab
+mint_ipl <source> counterfeit_cash
+mint_ipl <source> gunrunning_bunker
+```
+
+Dentro do IPL, use `/mint_ipl_report` para imprimir no F8 coordenadas, heading,
+ID esperado, ID resolvido e se os IDs conferem. Use `/mint_exit` para voltar.
+Os tres IPLs permanecem `enabled=false` e `calibrated=false` ate aprovacao em
+staging; portanto nao podem ser associados a uma propriedade normal.
+
+Quando `mz_banguard` esta iniciado, o runner exige que o BanGuard aceite um
+lifecycle `interior_calibration`. Destino, retorno e bucket sao definidos no
+servidor. A saida de calibracao tambem passa pelo servidor; isso evita falso
+positivo de teleport e impede que o client amplie a autorizacao. O resource
+continua funcional sem BanGuard, pois essa dependencia e opcional.
+
 Se `requireAce = true`, o server valida:
 
 ```txt
@@ -105,12 +128,18 @@ exports['mz_interiors']:DestroyCurrentInterior()
 exports['mz_interiors']:IsInsideInterior()
 exports['mz_interiors']:GetCurrentInterior()
 exports['mz_interiors']:GetShells()
+exports['mz_interiors']:EnterIPL(interiorCode, entranceCoords, options)
+exports['mz_interiors']:GetIPLInteriors()
 ```
 
 `GetShells()` tambem existe server-side e retorna uma lista sanitizada com
 `name`, `label`, `model`, `enabled`, `selectable`, `hasExit` e
 `disabledReason`. O `mz_houses` usa esse contrato para montar o select do menu
 admin e validar shell no servidor.
+
+`GetIPLInteriors()` tambem existe server-side. Um IPL so e retornado como
+selecionavel quando possui entrada e ID, e esta simultaneamente com
+`enabled=true` e `calibrated=true`.
 
 Exemplo:
 
@@ -155,7 +184,7 @@ Verifique:
 - Sem bau.
 - Sem guarda-roupa.
 - Sem garagem.
-- Sem MLO avancado.
+- IPLs organizacionais ainda sem bounds/moveis aprovados.
 - Sem instancia server-side/bucket nesta fase.
 
 ## Proximo passo recomendado

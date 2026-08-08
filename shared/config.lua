@@ -10,7 +10,11 @@ MZInteriorsConfig.Commands = {
   enter = 'mint_enter',
   exit = 'mint_exit',
   cleanup = 'mint_cleanup',
-  list = 'mint_list'
+  list = 'mint_list',
+  enterIpl = 'mint_ipl',
+  reportIpl = 'mint_ipl_report',
+  statusIpl = 'mint_ipl_status',
+  forceExitIpl = 'mint_ipl_force_exit'
 }
 
 MZInteriorsConfig.Notify = {
@@ -198,4 +202,60 @@ MZInteriorsConfig.Shells = {
     enabled = false,
     disabledReason = 'missing_exit_offset'
   }
+}
+
+-- Interiores nativos candidatos para organizacoes. As referencias vieram do
+-- catalogo tecnico ja auditado do mz_settings/Bob74. Cada IPL permanece
+-- indisponivel ate entrada, saida, heading e interior ID serem aprovados.
+MZInteriorsConfig.IPLInteriors = {
+  meth_lab = {
+    label = 'Laboratorio de metanfetamina', category = 'criminal.drug_lab',
+    enabled = true, calibrated = true,
+    load = { 'bkr_biker_interior_placement_interior_2_biker_dlc_int_ware01_milo_' },
+    interiorId = 247041,
+    -- Aprovado em staging em 2026-08-04. Interior 247041 e divergencia
+    -- server/client de 0.016 m no momento da captura.
+    entry = vector4(1009.49512, -3196.60010, -38.99826, 0.0),
+    -- O IPL sozinho deixa o ambiente sem o cenario funcional. O rollout inicial
+    -- usa o estilo basico, sem seguranca melhorada nem produtos em producao.
+    entitySets = {
+      inactive = {
+        'meth_lab_empty', 'meth_lab_upgrade', 'meth_lab_security_high',
+        'meth_lab_production'
+      },
+      active = { 'meth_lab_basic', 'meth_lab_setup' }
+    },
+    furniture = { enabled = false }
+  },
+  counterfeit_cash = {
+    label = 'Fabrica de dinheiro falso', category = 'criminal.laundering',
+    enabled = false, calibrated = false,
+    load = { 'bkr_biker_interior_placement_interior_5_biker_dlc_int_ware04_milo_' },
+    interiorId = 247809,
+    entry = vector4(1121.897, -3195.338, -40.4025, 0.0),
+    disabledReason = 'calibration_required',
+    furniture = { enabled = false }
+  },
+  gunrunning_bunker = {
+    label = 'Bunker de fabricacao', category = 'criminal.weapons',
+    enabled = false, calibrated = false,
+    load = { 'gr_grdlc_interior_placement_interior_1_grdlc_int_02_milo_' },
+    interiorId = 258561,
+    entry = vector4(892.6384, -3245.8664, -98.2645, 0.0),
+    disabledReason = 'calibration_required',
+    furniture = { enabled = false }
+  }
+}
+
+MZInteriorsConfig.IPLCalibration = {
+  convar = 'mz_interiors_ipl_calibration',
+  ace = 'group.mz_owner',
+  maxLoadTimeMs = 10000,
+  interiorResolveTimeMs = 3000,
+  sessionTimeoutMs = 900000,
+  requestWindowMs = 10000,
+  requestLimit = 6,
+  reportDistanceTolerance = 3.0,
+  entitySetApplyDelayMs = 250,
+  entryRecoveryRadius = 30.0
 }

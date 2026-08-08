@@ -4,7 +4,7 @@ lua54 'yes'
 
 author 'Mazus'
 description 'Data-driven temporary shell/interior layer for mz_core ecosystem'
-version '0.1.0'
+version '0.2.0'
 
 shared_scripts {
   'shared/config.lua',

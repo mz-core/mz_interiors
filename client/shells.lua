@@ -1,7 +1,10 @@
 local CurrentInterior = {
   active = false,
+  kind = nil,
   shell = nil,
   shellName = nil,
+  interiorCode = nil,
+  interiorId = nil,
   model = nil,
   object = nil,
   entrance = nil,
@@ -280,8 +283,11 @@ end
 
 local function resetState()
   CurrentInterior.active = false
+  CurrentInterior.kind = nil
   CurrentInterior.shell = nil
   CurrentInterior.shellName = nil
+  CurrentInterior.interiorCode = nil
+  CurrentInterior.interiorId = nil
   CurrentInterior.model = nil
   CurrentInterior.object = nil
   CurrentInterior.entrance = nil
@@ -473,6 +479,7 @@ function MZInteriors.EnterShell(shellName, entranceCoords, options)
   FreezeEntityPosition(ped, false)
   fadeIn()
 CurrentInterior.active = true
+CurrentInterior.kind = 'shell'
 CurrentInterior.shell = shell
 CurrentInterior.shellName = normalizedShellName
 CurrentInterior.model = shell.model
@@ -521,6 +528,171 @@ MZInteriors.Debug('entered_shell', {
   return true, cloneCurrentInterior()
 end
 
+local function activeGameBuild()
+  if type(GetGameBuildNumber) ~= 'function' then return nil end
+  local ok, build = pcall(GetGameBuildNumber)
+  return ok and tonumber(build) or nil
+end
+
+local function requestIPLInterior(definition)
+  local names = type(definition.load) == 'table' and definition.load or {}
+  if #names == 0 then return true end
+  for _, ipl in ipairs(names) do
+    if type(ipl) == 'string' and ipl ~= '' then RequestIpl(ipl) end
+  end
+  local timeout = tonumber((MZInteriorsConfig.IPLCalibration or {}).maxLoadTimeMs) or 10000
+  local startedAt = GetGameTimer()
+  while GetGameTimer() - startedAt < timeout do
+    local ready = true
+    for _, ipl in ipairs(names) do
+      if type(ipl) == 'string' and ipl ~= '' and not IsIplActive(ipl) then
+        RequestIpl(ipl)
+        ready = false
+      end
+    end
+    if ready then return true end
+    Wait(50)
+  end
+  return false, 'ipl_load_timeout'
+end
+
+local function applyIPLEntitySets(definition, resolvedInteriorId)
+  local entitySets = type(definition.entitySets) == 'table' and definition.entitySets or nil
+  if not entitySets then return true end
+  local interiorId = math.floor(tonumber(resolvedInteriorId or definition.interiorId) or 0)
+  if interiorId <= 0 then return false, 'ipl_interior_unresolved' end
+  if type(ActivateInteriorEntitySet) ~= 'function'
+      or type(DeactivateInteriorEntitySet) ~= 'function'
+      or type(RefreshInterior) ~= 'function' then
+    return false, 'ipl_entity_sets_unavailable'
+  end
+
+  if type(PinInteriorInMemory) == 'function' then PinInteriorInMemory(interiorId) end
+  local timeout = tonumber((MZInteriorsConfig.IPLCalibration or {}).interiorResolveTimeMs) or 3000
+  local startedAt = GetGameTimer()
+  if type(IsValidInterior) == 'function' then
+    while GetGameTimer() - startedAt < timeout and not IsValidInterior(interiorId) do
+      Wait(50)
+    end
+    if not IsValidInterior(interiorId) then return false, 'ipl_interior_unresolved' end
+  end
+
+  for _, name in ipairs(type(entitySets.inactive) == 'table' and entitySets.inactive or {}) do
+    if type(name) == 'string' and name ~= '' then DeactivateInteriorEntitySet(interiorId, name) end
+  end
+  for _, name in ipairs(type(entitySets.active) == 'table' and entitySets.active or {}) do
+    if type(name) == 'string' and name ~= '' then ActivateInteriorEntitySet(interiorId, name) end
+  end
+  RefreshInterior(interiorId)
+  Wait(math.max(0, math.min(2000,
+    math.floor(tonumber((MZInteriorsConfig.IPLCalibration or {}).entitySetApplyDelayMs) or 250))))
+  return true
+end
+
+local function resolvePedInterior(ped)
+  if type(GetInteriorFromEntity) ~= 'function' then return nil end
+  local timeout = tonumber((MZInteriorsConfig.IPLCalibration or {}).interiorResolveTimeMs) or 3000
+  local startedAt = GetGameTimer()
+  repeat
+    local interiorId = tonumber(GetInteriorFromEntity(ped))
+    if interiorId and interiorId > 0 then return interiorId end
+    Wait(50)
+  until GetGameTimer() - startedAt >= timeout
+  return nil
+end
+
+function MZInteriors.EnterIPL(interiorCode, entranceCoords, options)
+  options = type(options) == 'table' and options or {}
+  if CurrentInterior.active == true then return false, 'already_inside' end
+
+  local definition, definitionErr, normalizedCode = MZInteriors.GetIPLConfig(interiorCode)
+  if not definition then return false, definitionErr end
+  if definition.enabled ~= true and options.calibration ~= true then
+    return false, definition.disabledReason or 'ipl_interior_disabled'
+  end
+  local requiredBuild = tonumber(definition.gameBuild)
+  local currentBuild = activeGameBuild()
+  if requiredBuild and (not currentBuild or currentBuild < requiredBuild) then
+    return false, 'ipl_game_build_unsupported'
+  end
+  local internal = asVector4(options.entryCoords or definition.entry)
+  if not internal then return false, 'ipl_entry_missing' end
+
+  local ped = PlayerPedId()
+  local previousCoords = GetEntityCoords(ped)
+  local previousHeading = GetEntityHeading(ped)
+  local entrance = asVector4(entranceCoords, previousHeading)
+    or vector4(previousCoords.x, previousCoords.y, previousCoords.z, previousHeading)
+
+  local loaded, loadErr = requestIPLInterior(definition)
+  if not loaded then return false, loadErr end
+
+  local entryOffset = asVector3(options.entryOffset)
+  if entryOffset then
+    internal = vector4(
+      internal.x + entryOffset.x,
+      internal.y + entryOffset.y,
+      internal.z + entryOffset.z,
+      normalizeHeading(tonumber(options.entryHeading) or internal.w)
+    )
+  end
+
+  fadeOut()
+  FreezeEntityPosition(ped, true)
+  SetEntityCoords(ped, internal.x, internal.y, internal.z, false, false, false, false)
+  SetEntityHeading(ped, normalizeHeading(internal.w))
+  local collisionLoaded = waitForCollisionAt(vector3(internal.x, internal.y, internal.z))
+  Wait(100)
+  local resolvedInterior = resolvePedInterior(ped)
+  local expectedInterior = tonumber(definition.interiorId)
+  local interiorError = expectedInterior and not resolvedInterior and 'ipl_interior_unresolved'
+    or expectedInterior and resolvedInterior ~= expectedInterior and 'ipl_interior_mismatch'
+    or nil
+  local styled, styleErr = true, nil
+  if collisionLoaded == true and not interiorError then
+    styled, styleErr = applyIPLEntitySets(definition, resolvedInterior or expectedInterior)
+  end
+  if collisionLoaded ~= true or interiorError or styled ~= true then
+    SetEntityCoords(ped, previousCoords.x, previousCoords.y, previousCoords.z, false, false, false, false)
+    SetEntityHeading(ped, previousHeading)
+    FreezeEntityPosition(ped, false)
+    fadeIn()
+    return false, collisionLoaded ~= true and 'ipl_collision_failed'
+      or interiorError or styleErr or 'ipl_entity_sets_failed'
+  end
+
+  FreezeEntityPosition(ped, false)
+  fadeIn()
+  CurrentInterior.active = true
+  CurrentInterior.kind = 'ipl'
+  CurrentInterior.shell = definition
+  CurrentInterior.shellName = normalizedCode
+  CurrentInterior.interiorCode = normalizedCode
+  CurrentInterior.interiorId = resolvedInterior or expectedInterior
+  CurrentInterior.model = nil
+  CurrentInterior.object = nil
+  CurrentInterior.entrance = entrance
+  CurrentInterior.exitCoords = internal
+  CurrentInterior.entryCoords = internal
+  CurrentInterior.defaultEntryCoords = asVector4(definition.entry)
+  CurrentInterior.previousCoords = vector3(previousCoords.x, previousCoords.y, previousCoords.z)
+  CurrentInterior.previousHeading = previousHeading
+  CurrentInterior.spawnCoords = vector3(internal.x, internal.y, internal.z)
+  CurrentInterior.shellHeading = 0.0
+  CurrentInterior.instanceId = options.instanceId
+    or ('client:%s:ipl:%s'):format(GetPlayerServerId(PlayerId()), GetGameTimer())
+  CurrentInterior.metadata = options.metadata
+
+  MZInteriors.Debug('entered_ipl', {
+    interiorCode = normalizedCode,
+    interiorId = CurrentInterior.interiorId,
+    calibration = options.calibration == true,
+    instanceId = CurrentInterior.instanceId
+  })
+  MZInteriors.Notify('Voce entrou no interior IPL.', 'success')
+  return true, cloneCurrentInterior()
+end
+
 function MZInteriors.ExitShell()
   if CurrentInterior.active ~= true then
     return false, 'not_inside'
@@ -561,11 +733,17 @@ function MZInteriors.ResolveCurrentInteriorPoint(offset)
     return nil, 'not_inside'
   end
 
-  local world = shellOffsetToWorld(
-    CurrentInterior.object,
-    CurrentInterior.spawnCoords,
-    offset
-  )
+  local normalizedOffset = asVector3(offset)
+  local world
+  if CurrentInterior.kind == 'ipl' and normalizedOffset then
+    world = vector3(
+      CurrentInterior.spawnCoords.x + normalizedOffset.x,
+      CurrentInterior.spawnCoords.y + normalizedOffset.y,
+      CurrentInterior.spawnCoords.z + normalizedOffset.z
+    )
+  else
+    world = shellOffsetToWorld(CurrentInterior.object, CurrentInterior.spawnCoords, offset)
+  end
 
   if not world then
     return nil, 'invalid_offset'
@@ -583,11 +761,17 @@ function MZInteriors.CaptureCurrentInteriorPoint(worldCoords)
     return nil, 'not_inside'
   end
 
-  local offset = worldToShellOffset(
-    CurrentInterior.object,
-    CurrentInterior.spawnCoords,
-    worldCoords
-  )
+  local normalizedWorld = asVector3(worldCoords)
+  local offset
+  if CurrentInterior.kind == 'ipl' and normalizedWorld then
+    offset = vector3(
+      normalizedWorld.x - CurrentInterior.spawnCoords.x,
+      normalizedWorld.y - CurrentInterior.spawnCoords.y,
+      normalizedWorld.z - CurrentInterior.spawnCoords.z
+    )
+  else
+    offset = worldToShellOffset(CurrentInterior.object, CurrentInterior.spawnCoords, worldCoords)
+  end
 
   if not offset then
     return nil, 'invalid_world_coords'
@@ -701,8 +885,34 @@ function MZInteriors.GetShells()
   return out
 end
 
+function MZInteriors.GetIPLInteriors()
+  local catalog = MZInteriorsConfig.IPLInteriors or {}
+  local out = {}
+  for code, definition in pairs(catalog) do
+    definition = type(definition) == 'table' and definition or {}
+    out[#out + 1] = {
+      name = code,
+      label = definition.label or code,
+      category = definition.category,
+      type = 'ipl',
+      interiorId = tonumber(definition.interiorId),
+      enabled = definition.enabled == true and definition.calibrated == true,
+      selectable = definition.enabled == true and definition.calibrated == true,
+      calibrated = definition.calibrated == true,
+      disabledReason = definition.enabled == true and definition.calibrated == true
+        and nil or (definition.disabledReason or 'calibration_required')
+    }
+  end
+  table.sort(out, function(left, right) return tostring(left.name) < tostring(right.name) end)
+  return out
+end
+
 exports('EnterShell', function(shellName, entranceCoords, options)
   return MZInteriors.EnterShell(shellName, entranceCoords, options)
+end)
+
+exports('EnterIPL', function(interiorCode, entranceCoords, options)
+  return MZInteriors.EnterIPL(interiorCode, entranceCoords, options)
 end)
 
 exports('ExitShell', function()
@@ -728,6 +938,10 @@ end)
 
 exports('GetShells', function()
   return MZInteriors.GetShells()
+end)
+
+exports('GetIPLInteriors', function()
+  return MZInteriors.GetIPLInteriors()
 end)
 
 exports('ResolveCurrentInteriorPoint', function(offset)
