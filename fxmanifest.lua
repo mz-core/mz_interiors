@@ -25,3 +25,5 @@ files {
 }
 
 data_file 'DLC_ITYP_REQUEST' 'stream/*.ytyp'
+
+dependency 'mz_core'

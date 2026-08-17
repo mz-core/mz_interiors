@@ -118,6 +118,13 @@ function MZInteriors.RunCommandAction(action, args)
   end
 
   if action == 'enter' then
+    local guardOk, allowed = pcall(function()
+      return exports['mz_core']:CanLocalPlayerPerformAction('property.use')
+    end)
+    if not guardOk or allowed ~= true then
+      MZInteriors.Notify('Acao bloqueada pelo estado do jogador.', 'error')
+      return
+    end
     local shellName = trim(args[1])
     if shellName == '' then
       MZInteriors.Notify('Uso: /' .. tostring((MZInteriorsConfig.Commands or {}).enter or 'mint_enter') .. ' shellName', 'error')
