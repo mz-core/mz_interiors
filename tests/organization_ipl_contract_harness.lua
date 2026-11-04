@@ -37,6 +37,9 @@ expect(client:find('ActivateInteriorEntitySet', 1, true)
   and client:find('RefreshInterior', 1, true),
   'IPL entity-set lifecycle is incomplete')
 expect(client:find("CurrentInterior.kind = 'ipl'", 1, true), 'IPL current context missing')
+expect(client:find("resourceName ~= 'bob74_ipl'", 1, true)
+  and client:find('applyIPLEntitySets(definition, current.interiorId)', 1, true),
+  'Bob74 restart must restore MZ-owned dynamic IPL entity sets')
 expect(config:find('mz_interiors_ipl_calibration', 1, true), 'IPL calibration convar missing')
 expect(server:find('IsPlayerAceAllowed', 1, true), 'IPL calibration ACE guard missing')
 expect(server:find("'interior_calibration'", 1, true), 'BanGuard calibration lifecycle missing')

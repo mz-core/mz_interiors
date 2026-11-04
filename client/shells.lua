@@ -693,6 +693,27 @@ function MZInteriors.EnterIPL(interiorCode, entranceCoords, options)
   return true, cloneCurrentInterior()
 end
 
+AddEventHandler('onClientResourceStart', function(resourceName)
+  if resourceName ~= 'bob74_ipl' then return end
+
+  CreateThread(function()
+    Wait(500)
+
+    local current = CurrentInterior
+    local definition = current.shell
+    if current.active ~= true or current.kind ~= 'ipl'
+        or type(definition) ~= 'table' or type(definition.entitySets) ~= 'table' then
+      return
+    end
+
+    local restored, restoreErr = applyIPLEntitySets(definition, current.interiorId)
+    if not restored then
+      print(('[mz_interiors] Falha ao restaurar entity sets após reinício de bob74_ipl: %s')
+        :format(tostring(restoreErr)))
+    end
+  end)
+end)
+
 function MZInteriors.ExitShell()
   if CurrentInterior.active ~= true then
     return false, 'not_inside'
